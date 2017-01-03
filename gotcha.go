@@ -40,7 +40,12 @@ func (g *Gotcha) Get(index interface{}) interface{} {
 }
 
 // Set sets data for an index
-func (g *Gotcha) Set(index interface{}, value interface{}, ttl int64) {
+func (g *Gotcha) Set(index interface{}, value interface{}) {
+	g.SetTTL(index, value, 0)
+}
+
+// SetTTL sets data for an index with ttl
+func (g *Gotcha) SetTTL(index interface{}, value interface{}, ttl int64) {
 	g.m.Lock()
 	defer g.m.Unlock()
 	it := g.d[index]
