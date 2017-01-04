@@ -9,7 +9,6 @@ import (
 type Gotcha struct {
 	m *sync.RWMutex
 	d map[interface{}]*item
-	f map[interface{}]func()
 }
 
 type item struct {
@@ -23,7 +22,6 @@ func New() *Gotcha {
 	return &Gotcha{
 		m: &sync.RWMutex{},
 		d: map[interface{}]*item{},
-		f: map[interface{}]func(){},
 	}
 }
 
@@ -37,6 +35,21 @@ func (g *Gotcha) Get(index interface{}) interface{} {
 		return nil
 	}
 	return it.v
+}
+
+// GetMulti retrieves multiple data
+// faster than Get
+func (g *Gotcha) GetMulti(indexes []interface{}) []interface{} {
+	its := make([]interface{}, len(indexes))
+	g.m.RLock()
+	defer g.m.RUnlock()
+	for i := range its {
+		it := g.d[indexes[i]]
+		if it != nil {
+			its[i] = it.v
+		}
+	}
+	return its
 }
 
 // Set sets data for an index
@@ -58,6 +71,29 @@ func (g *Gotcha) SetTTL(index interface{}, value interface{}, ttl int64) {
 	it.v = value
 }
 
+// SetMulti sets data for indexes
+func (g *Gotcha) SetMulti(indexes []interface{}, values []interface{}) {
+	g.SetMultiTTL(indexes, values, 0)
+}
+
+// SetMultiTTL sets data for indexes with a ttl
+func (g *Gotcha) SetMultiTTL(indexes []interface{}, values []interface{}, ttl int64) {
+	g.m.Lock()
+	defer g.m.Unlock()
+	now := time.Now().UnixNano()
+	for i := range indexes {
+		index := indexes[i]
+		it := g.d[index]
+		if it == nil {
+			it = &item{}
+			g.d[index] = it
+		}
+		it.ts = now
+		it.ttl = ttl
+		it.v = values[i]
+	}
+}
+
 // Unset removes data for an index
 func (g *Gotcha) Unset(index interface{}) {
 	g.m.Lock()
@@ -70,12 +106,15 @@ func (g *Gotcha) Purge() {
 	g.m.Lock()
 	defer g.m.Unlock()
 	g.d = map[interface{}]*item{}
-	g.f = map[interface{}]func(){}
 }
 
-// Filler registers a filler for an index
-func (g *Gotcha) Filler(index interface{}, f func()) {
-	g.m.RLock()
-	defer g.m.RUnlock()
-	g.f[index] = f
+// Extend replace old ttl with the new one
+func (g *Gotcha) Extend(index interface{}, ttl int64) {
+	g.m.Lock()
+	defer g.m.Unlock()
+	it := g.d[index]
+	if it != nil {
+		it.ts = time.Now().UnixNano()
+		it.ttl = ttl
+	}
 }

@@ -1,6 +1,7 @@
 package gotcha
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -20,6 +21,7 @@ func TestGetSet(t *testing.T) {
 		{1, "test"},
 		{1, nil},
 		{1, 1.4},
+		{true, false},
 	}
 
 	g := New()
@@ -52,7 +54,29 @@ func TestPurge(t *testing.T) {
 	g.Set(1, 2)
 	g.Set(2, 3)
 	g.Purge()
-	if g.Get(1) != nil || g.Get(2) != nil || len(g.d) > 0 || len(g.f) > 0 {
+	if g.Get(1) != nil || g.Get(2) != nil || len(g.d) > 0 {
 		t.Errorf("expected purged data to be nil")
+	}
+}
+
+func TestMulti(t *testing.T) {
+	indexes := []interface{}{1, 2, 3, "a", "aaaaaaaaaaaaaa", 1.3}
+	values := []interface{}{"aaaaaa", "b", 3, 5, 2.9, nil}
+
+	g := New()
+	g.SetMulti(indexes, values)
+	res := g.GetMulti(indexes)
+	if !reflect.DeepEqual(res, values) {
+		t.Errorf("expected values to be %v; got %v", values, res)
+	}
+}
+
+func TestExtend(t *testing.T) {
+	g := New()
+	g.SetTTL(1, 2, 10)
+	g.Extend(1, 20)
+
+	if g.d[1].ttl != 20 {
+		t.Errorf("expected ttl to be %v; got %v", 20, g.d[1].ttl)
 	}
 }

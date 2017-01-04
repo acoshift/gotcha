@@ -5,4 +5,6 @@
 [![Build Status](https://travis-ci.org/acoshift/gotcha.svg?branch=master)](https://travis-ci.org/acoshift/gotcha)
 [![Coverage Status](https://coveralls.io/repos/github/acoshift/gotcha/badge.svg?branch=master)](https://coveralls.io/github/acoshift/gotcha?branch=master)
 
-Go cache :D
+Gotcha!
+
+Simple in-memory cache with map
