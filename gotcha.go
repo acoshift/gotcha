@@ -13,8 +13,8 @@ type Gotcha struct {
 
 type item struct {
 	v   interface{}
-	ts  int64
-	ttl int64
+	ts  time.Time
+	ttl time.Duration
 }
 
 // New creates a gotcha
@@ -28,6 +28,17 @@ func New() *Gotcha {
 // Get retrieves data for an index
 // return nil if not found
 func (g *Gotcha) Get(index interface{}) interface{} {
+	g.m.RLock()
+	defer g.m.RUnlock()
+	it := g.d[index]
+	if it == nil || expired(it) {
+		return nil
+	}
+	return it.v
+}
+
+// MustGet gets data for an index even if it already expired
+func (g *Gotcha) MustGet(index interface{}) interface{} {
 	g.m.RLock()
 	defer g.m.RUnlock()
 	it := g.d[index]
@@ -45,7 +56,7 @@ func (g *Gotcha) GetMulti(indexes []interface{}) []interface{} {
 	defer g.m.RUnlock()
 	for i := range its {
 		it := g.d[indexes[i]]
-		if it != nil {
+		if it != nil && !expired(it) {
 			its[i] = it.v
 		}
 	}
@@ -58,7 +69,7 @@ func (g *Gotcha) Set(index interface{}, value interface{}) {
 }
 
 // SetTTL sets data for an index with ttl
-func (g *Gotcha) SetTTL(index interface{}, value interface{}, ttl int64) {
+func (g *Gotcha) SetTTL(index interface{}, value interface{}, ttl time.Duration) {
 	g.m.Lock()
 	defer g.m.Unlock()
 	it := g.d[index]
@@ -66,7 +77,7 @@ func (g *Gotcha) SetTTL(index interface{}, value interface{}, ttl int64) {
 		it = &item{}
 		g.d[index] = it
 	}
-	it.ts = time.Now().UnixNano()
+	it.ts = time.Now()
 	it.ttl = ttl
 	it.v = value
 }
@@ -77,10 +88,10 @@ func (g *Gotcha) SetMulti(indexes []interface{}, values []interface{}) {
 }
 
 // SetMultiTTL sets data for indexes with a ttl
-func (g *Gotcha) SetMultiTTL(indexes []interface{}, values []interface{}, ttl int64) {
+func (g *Gotcha) SetMultiTTL(indexes []interface{}, values []interface{}, ttl time.Duration) {
 	g.m.Lock()
 	defer g.m.Unlock()
-	now := time.Now().UnixNano()
+	now := time.Now()
 	for i := range indexes {
 		index := indexes[i]
 		it := g.d[index]
@@ -108,13 +119,48 @@ func (g *Gotcha) Purge() {
 	g.d = map[interface{}]*item{}
 }
 
-// Extend replace old ttl with the new one
-func (g *Gotcha) Extend(index interface{}, ttl int64) {
+// Extend replaces old ttl with the new one if value not expired
+func (g *Gotcha) Extend(index interface{}, ttl time.Duration) {
+	g.m.Lock()
+	defer g.m.Unlock()
+	it := g.d[index]
+	if it != nil && !expired(it) {
+		it.ts = time.Now()
+		it.ttl = ttl
+	}
+}
+
+// MustExtend force replace old ttl with the new one even if it already expired
+func (g *Gotcha) MustExtend(index interface{}, ttl time.Duration) {
 	g.m.Lock()
 	defer g.m.Unlock()
 	it := g.d[index]
 	if it != nil {
-		it.ts = time.Now().UnixNano()
+		it.ts = time.Now()
 		it.ttl = ttl
 	}
+}
+
+// Exists checks is index exists but not check is expired
+func (g *Gotcha) Exists(index interface{}) bool {
+	g.m.RLock()
+	defer g.m.RUnlock()
+	return g.d[index] != nil
+}
+
+// Expired checks is index expired
+// return false if expired or not exists
+func (g *Gotcha) Expired(index interface{}) bool {
+	g.m.RLock()
+	defer g.m.RUnlock()
+	it := g.d[index]
+	return it != nil && expired(it)
+}
+
+// helper funcitons
+func expired(it *item) bool {
+	if it.ttl <= 0 {
+		return false
+	}
+	return time.Now().After(it.ts.Add(it.ttl))
 }

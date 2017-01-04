@@ -3,6 +3,7 @@ package gotcha
 import (
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestGetSet(t *testing.T) {
@@ -35,6 +36,10 @@ func TestGetSet(t *testing.T) {
 
 	// try get not seted value
 	if g.Get(12345) != nil {
+		t.Errorf("expected not set value to be nil")
+	}
+
+	if g.MustGet(9999) != nil {
 		t.Errorf("expected not set value to be nil")
 	}
 }
@@ -73,10 +78,46 @@ func TestMulti(t *testing.T) {
 
 func TestExtend(t *testing.T) {
 	g := New()
-	g.SetTTL(1, 2, 10)
-	g.Extend(1, 20)
+	g.SetTTL(1, 2, time.Millisecond*10)
+	g.Extend(1, time.Millisecond*20)
 
-	if g.d[1].ttl != 20 {
-		t.Errorf("expected ttl to be %v; got %v", 20, g.d[1].ttl)
+	if g.d[1].ttl != time.Millisecond*20 {
+		t.Errorf("expected ttl to be %v; got %v", time.Millisecond*20, g.d[1].ttl)
+	}
+
+	time.Sleep(time.Millisecond * 30)
+	if g.Get(1) != nil || g.MustGet(1) != 2 {
+		t.Errorf("expected must get can get expired index")
+	}
+	g.MustExtend(1, time.Millisecond*10)
+	if g.Expired(1) {
+		t.Errorf("expected must extend to extend expired index")
+	}
+}
+
+func TestExists(t *testing.T) {
+	g := New()
+	g.Set(1, true)
+	g.Set(2, nil)
+	if !g.Exists(1) {
+		t.Errorf("expected 1 exists")
+	}
+	if !g.Exists(2) {
+		t.Errorf("expected 2 exists")
+	}
+	if g.Exists(3) {
+		t.Errorf("expected 3 not exists")
+	}
+}
+
+func TestExpired(t *testing.T) {
+	g := New()
+	g.SetTTL(1, 2, time.Millisecond*10)
+	if g.Expired(1) {
+		t.Errorf("expected 1 not expired")
+	}
+	time.Sleep(time.Millisecond * 15)
+	if !g.Expired(1) {
+		t.Errorf("expected 1 expired")
 	}
 }
