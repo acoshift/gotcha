@@ -157,6 +157,28 @@ func (g *Gotcha) Expired(index interface{}) bool {
 	return it != nil && expired(it)
 }
 
+// Cleanup removes all expired data
+func (g *Gotcha) Cleanup() {
+	g.m.Lock()
+	defer g.m.Unlock()
+	for index, it := range g.d {
+		if expired(it) {
+			delete(g.d, index)
+		}
+	}
+}
+
+// Timestamp returns timestamp of an index
+func (g *Gotcha) Timestamp(index interface{}) *time.Time {
+	g.m.RLock()
+	defer g.m.RUnlock()
+	it := g.d[index]
+	if it == nil {
+		return nil
+	}
+	return &it.ts
+}
+
 // helper funcitons
 func expired(it *item) bool {
 	if it.ttl <= 0 {

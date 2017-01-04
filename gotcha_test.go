@@ -121,3 +121,30 @@ func TestExpired(t *testing.T) {
 		t.Errorf("expected 1 expired")
 	}
 }
+
+func TestCleanup(t *testing.T) {
+	g := New()
+	g.SetTTL(1, 2, time.Millisecond*10)
+	g.SetTTL(2, 3, time.Millisecond*20)
+	time.Sleep(time.Millisecond * 15)
+	g.Cleanup()
+	if g.Exists(1) {
+		t.Errorf("expected 1 not exists")
+	}
+	if !g.Exists(2) {
+		t.Errorf("expected 2 exists")
+	}
+}
+
+func TestTimestamp(t *testing.T) {
+	g := New()
+	g.SetTTL(1, 2, time.Millisecond*10)
+	ts := g.Timestamp(1)
+	if ts == nil {
+		t.Errorf("expected timestamp not nil")
+	}
+	ts = g.Timestamp(2)
+	if ts != nil {
+		t.Errorf("expected timestamp to be nil")
+	}
+}
